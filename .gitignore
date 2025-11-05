@@ -1,0 +1,12 @@
+venv/
+.venv/
+env/
+
+.vscode/
+.env
+.env.*
+app/.env
+
+app/out/
+__pycache__/
+*.py[cod]
