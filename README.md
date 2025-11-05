@@ -1,13 +1,12 @@
 # Voice-to-AI Streamlit App
 
-A Streamlit app where you can record or upload audio, transcribe it with Whisper, send the transcript to an OpenAI chat model (guided by a system prompt), and get either a textual answer or a generated PDF to download.
+A Streamlit app where you can record an audio, transcribe it, send the transcript to an OpenAI chat model (guided by a system prompt), and get a PDF to download.
 
 ## Features
-- Record audio in-browser or upload `.wav/.mp3/.m4a/ogg`
-- Transcribe via Whisper (`whisper-1`)
+- Record audio in-browser
+- Transcribe via OpenAI `gpt-4o-mini-transcribe`
 - Ask `gpt-4o-mini` (configurable) with a custom system prompt
-- Get back either `text` or `pdf` as a JSON-structured response
-- If `pdf`, the app generates a simple PDF for download
+- Generates a PDF for download
 
 ## Setup
 1. Ensure Python 3.9+
@@ -31,7 +30,7 @@ streamlit run app/streamlit_app.py
 ```
 
 ## How it works
-- The app captures audio (record or upload) and sends it to Whisper for transcription.
+- The app captures audio and sends it to `gpt-4o-mini-transcribe` for transcription.
 - The transcript is submitted to the selected chat model with your system prompt.
 - The model returns a JSON object, for example:
   ```json
