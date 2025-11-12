@@ -13,7 +13,6 @@ from pdf_utils import generate_markdown_pdf_bytes
 load_dotenv()
 st.set_page_config(page_title="Synthèse d'entretien RH", page_icon="💼", layout="centered")
 
-
 DEFAULT_SYSTEM_PROMPT = """
 Tu es un assistant RH spécialisé dans la rédaction de synthèses d’entretiens de recrutement en français.
 
@@ -66,17 +65,39 @@ def main() -> None:
 	st.subheader("1) Fournir l'audio")
 	st.caption("Enregistrer depuis le microphone")
 
-	# Recorder-only flow: no uploader/drag-and-drop
+	# Initialiser le stockage persistant pour l'audio (sur les reruns Streamlit)
+	if "audio_bytes" not in st.session_state:
+		st.session_state["audio_bytes"] = None
+
+	# Enregistrer depuis le micro (le composant renvoie les octets une seule fois)
 	recorded_bytes = audio_recorder(pause_threshold=2.0)
 
-	audio_bytes: Optional[bytes] = None
+	if recorded_bytes:
+		# Conserver l'enregistrement dans la session pour éviter de le perdre lors d'un rerun
+		st.session_state["audio_bytes"] = recorded_bytes
+
+	audio_bytes: Optional[bytes] = st.session_state.get("audio_bytes")
 	filename = "recording.wav"
 
-	if recorded_bytes:
-		audio_bytes = recorded_bytes
+	col_preview, col_actions = st.columns([3,1])
+	with col_preview:
+		if audio_bytes:
+			st.audio(audio_bytes, format="audio/wav")
+			st.caption(f"Audio prêt (taille: {len(audio_bytes)} octets)")
+		else:
+			st.caption("Aucun audio capturé pour le moment.")
+	with col_actions:
+		if audio_bytes and st.button("🗑️ Effacer", help="Supprimer l'enregistrement et recommencer"):
+			st.session_state["audio_bytes"] = None
+			st.experimental_rerun()
 
-	if audio_bytes:
-		st.audio(audio_bytes, format="audio/wav")
+	# Fallback discret: si l'enregistrement micro échoue (permissions navigateur), proposer un upload
+	if not audio_bytes:
+		uploaded = st.file_uploader("Ou téléverser un fichier audio (wav/mp3)", type=["wav","mp3","m4a","ogg"], accept_multiple_files=False)
+		if uploaded:
+			st.session_state["audio_bytes"] = uploaded.read()
+			filename = uploaded.name or filename
+			st.experimental_rerun()
 
 	st.subheader("2) Transcrire et obtenir la synthèse")
 	if st.button("Transcrire et générer le PDF", type="primary"):
