@@ -5,6 +5,10 @@ from typing import Optional
 import streamlit as st
 from dotenv import load_dotenv
 from audio_recorder_streamlit import audio_recorder
+try:  # Fallback recorder for better browser compatibility
+	from st_audiorec import st_audiorec  # type: ignore
+except Exception:
+	st_audiorec = None  # type: ignore
 
 from ai_utils import transcribe_audio_bytes, chat_with_json_response
 from pdf_utils import generate_markdown_pdf_bytes
@@ -69,12 +73,19 @@ def main() -> None:
 	if "audio_bytes" not in st.session_state:
 		st.session_state["audio_bytes"] = None
 
-	# Enregistrer depuis le micro (le composant renvoie les octets une seule fois)
+	# Enregistrer depuis le micro (composant principal)
 	recorded_bytes = audio_recorder(pause_threshold=2.0)
-
-	if recorded_bytes:
+	# Filtrer les captures vides/minimes dues à des permissions/erreurs
+	if recorded_bytes and len(recorded_bytes) > 100:  # ~ > header WAV
 		# Conserver l'enregistrement dans la session pour éviter de le perdre lors d'un rerun
 		st.session_state["audio_bytes"] = recorded_bytes
+
+	# Mode compatibilité (optionnel)
+	if st_audiorec is not None:
+		with st.expander("Problème de micro ? Essayer le mode compatibilité"):
+			alt_bytes = st_audiorec()
+			if isinstance(alt_bytes, (bytes, bytearray)) and len(alt_bytes) > 100:
+				st.session_state["audio_bytes"] = bytes(alt_bytes)
 
 	audio_bytes: Optional[bytes] = st.session_state.get("audio_bytes")
 	filename = "recording.wav"
@@ -89,15 +100,21 @@ def main() -> None:
 	with col_actions:
 		if audio_bytes and st.button("🗑️ Effacer", help="Supprimer l'enregistrement et recommencer"):
 			st.session_state["audio_bytes"] = None
-			st.experimental_rerun()
+			st.rerun()
 
 	# Fallback discret: si l'enregistrement micro échoue (permissions navigateur), proposer un upload
 	if not audio_bytes:
-		uploaded = st.file_uploader("Ou téléverser un fichier audio (wav/mp3)", type=["wav","mp3","m4a","ogg"], accept_multiple_files=False)
-		if uploaded:
-			st.session_state["audio_bytes"] = uploaded.read()
-			filename = uploaded.name or filename
-			st.experimental_rerun()
+		uploaded = st.file_uploader(
+			"Ou téléverser un fichier audio (wav/mp3/m4a/ogg)",
+			type=["wav", "mp3", "m4a", "ogg"],
+			accept_multiple_files=False,
+		)
+		if uploaded is not None:
+			file_bytes = uploaded.read()
+			if file_bytes and len(file_bytes) > 100:
+				st.session_state["audio_bytes"] = file_bytes
+				filename = uploaded.name or filename
+				st.success("Fichier chargé. Vous pouvez lancer la transcription.")
 
 	st.subheader("2) Transcrire et obtenir la synthèse")
 	if st.button("Transcrire et générer le PDF", type="primary"):
